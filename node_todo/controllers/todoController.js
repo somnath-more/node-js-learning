@@ -21,7 +21,7 @@ const db = require('../db');
 // get all users
 const getAllTodos = async (req, res) => {
     try {
-        const todos = await db.execute('SELECT * FROM todos');
+        const [todos] = await db.execute('SELECT * FROM todos');
         res.status(200).json(todos);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching todos' });
@@ -31,8 +31,16 @@ const getAllTodos = async (req, res) => {
 const createTodo = async (req, res) => {
     const { title, description } = req.body;
     try {
-        const newTodo = new Todo({ title, description });
-        await db.execute('INSERT INTO todos (title, description) VALUES (?, ?)', [title, description]);
+        // const [newTodo] = new Todo({ title, description });
+        const[result]=await db.execute('INSERT INTO todos (title, description) VALUES (?, ?)', [title, description]);
+             const [newTodoRows] = await db.execute(
+                'SELECT id, title, description FROM users WHERE id = ?',
+                [result.insertId]
+              );
+          
+              const newTodo = newTodoRows[0];
+          
+         
         res.status(201).json(newTodo);
     } catch (error) {
         res.status(500).json({ message: 'Error creating todo' });
