@@ -22,6 +22,9 @@ const db = require('../db');
 const getAllTodos = async (req, res) => {
     try {
         const [todos] = await db.execute('SELECT * FROM todos');
+        if (!todos || todos.length === 0) {
+            return res.status(404).json({ message: 'No todos found' });
+        }
         res.status(200).json(todos);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching todos' });
@@ -29,16 +32,33 @@ const getAllTodos = async (req, res) => {
 }
 // create todo
 const createTodo = async (req, res) => {
-    const { title, description } = req.body;
+    const { title, description,isCompleted,userID } = req.body;
     try {
         // const [newTodo] = new Todo({ title, description });
-        const[result]=await db.execute('INSERT INTO todos (title, description) VALUES (?, ?)', [title, description]);
-             const [newTodoRows] = await db.execute(
-                'SELECT id, title, description FROM users WHERE id = ?',
+        const [result]=await db.execute('INSERT INTO todos (title, description,completed,user_id) VALUES (?, ?,?,?)', [title, description, isCompleted,userID]);
+         
+        if (!result || result.affectedRows === 0) {
+            return res.status(400).json({ message: 'Error creating todo' });
+        }
+        console.log(result);
+        
+        const [newTodoRows] = await db.execute(
+                'SELECT id, title, description,completed,user_id FROM todos WHERE id = ?',
                 [result.insertId]
               );
           
               const newTodo = newTodoRows[0];
+        // ✅ Step 3: Get user info
+        // const user = await User.findById(userID);
+         const [user] = await db.execute('SELECT * FROM users WHERE id = ?', [userID]);
+        if (!user || user.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        newTodo.user = user[0];
+          console.log(newTodo);
+        if (!newTodo) {
+            return res.status(404).json({ message: 'Todo not found' });
+        }
           
          
         res.status(201).json(newTodo);
@@ -50,11 +70,17 @@ const createTodo = async (req, res) => {
 const getTodoById = async (req, res) => {
     const { id } = req.params;
     try {
-        const todo = await db.execute('SELECT * FROM todos WHERE id = ?', [id]);
-        if (!todo) {
+        const [todo] = await db.execute('SELECT * FROM todos WHERE id = ?', [id]);
+        if (!todo || todo.length === 0) {
             return res.status(404).json({ message: 'Todo not found' });
         }
-        res.status(200).json(todo);
+        // user info
+        const [user] = await db.execute('SELECT * FROM users WHERE id = ?', [todo[0].user_id]);
+        if (!user || user.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        todo[0].user = user[0];
+        res.status(200).json(todo[0]);
     }
     catch (error) {
         res.status(500).json({ message: 'Error fetching todo' });
@@ -63,13 +89,23 @@ const getTodoById = async (req, res) => {
 // update todo
 const updateTodo = async (req, res) => {
     const { id } = req.params;
-    const { title, description } = req.body;
+    const { title, description ,isCompleted} = req.body;
     try {
-        const todo = await db.execute('UPDATE todos SET title = ?, description = ? WHERE id = ?', [title, description, id]);
-        if (!todo) {
+        const [todo] = await db.execute('UPDATE todos SET title = ?, description = ?,completed = ? WHERE id = ?', [title, description,isCompleted, id]);
+        if (!todo || todo.length === 0) {
             return res.status(404).json({ message: 'Todo not found' });
         }
-        res.status(200).json(todo);
+        const [updatedTodo] = await db.execute('SELECT * FROM todos WHERE id = ?', [id]);
+        if (!updatedTodo || updatedTodo.length === 0) {
+            return res.status(404).json({ message: 'Todo not found' });
+        }
+        // user info
+        const [user] = await db.execute('SELECT * FROM users WHERE id = ?', [updatedTodo[0].user_id]);
+        if (!user || user.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        updatedTodo[0].user = user[0];
+        res.status(200).json(updatedTodo[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error updating todo' });
     }
@@ -78,8 +114,8 @@ const updateTodo = async (req, res) => {
 const deleteTodo = async (req, res) => {
     const { id } = req.params;
     try {
-        const todo = await db.execute('DELETE FROM todos WHERE id = ?', [id]);
-        if (!todo) {
+        const [todo] = await db.execute('DELETE FROM todos WHERE id = ?', [id]);
+        if (!todo || todo.affectedRows === 0) {
             return res.status(404).json({ message: 'Todo not found' });
         }
         res.status(200).json({ message: 'Todo deleted successfully' });
@@ -87,15 +123,18 @@ const deleteTodo = async (req, res) => {
         res.status(500).json({ message: 'Error deleting todo' });
     }
 }
-
+// MARK TODO AS COMPLETED
+// DATE: 2025-05-16
 const completeTodo = async (req, res) => {
     const { id } = req.params;
     try {
-        const todo = await db.execute('UPDATE todos SET completed = true WHERE id = ?', [id]);
-        if (!todo) {
+        const [todo] = await db.execute('UPDATE todos SET completed = true WHERE id = ?', [id]);
+        if (!todo || todo.affectedRows === 0) {
             return res.status(404).json({ message: 'Todo not found' });
         }
-        res.status(200).json(todo);
+        console.log(todo);
+        
+        res.status(200).json({ message: 'Todo Mark As Completed successfully' })
     } catch (error) {
         res.status(500).json({ message: 'Error completing todo' });
     }
